@@ -159,7 +159,7 @@ readonly StackPanel hint = new();
 
         var copyHint = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
         copyHint.Children.Add(KeyCap("C")); copyHint.Children.Add(HintText("Copy"));
-        var formatHint = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+        var formatHint = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 5, 0, 0) };
         formatHint.Children.Add(KeyCap("Shift")); formatHint.Children.Add(HintText("Format"));
         hint.Children.Add(copyHint);
         hint.Children.Add(formatHint);
