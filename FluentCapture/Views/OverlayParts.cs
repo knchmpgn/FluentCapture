@@ -157,11 +157,12 @@ readonly StackPanel hint = new();
         };
         TextBlock HintText(string text) { var t = new TextBlock { Text = text, FontSize = 11, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) }; t.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush"); return t; }
 
-        var row = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
-        row.Children.Add(KeyCap("C")); row.Children.Add(HintText("Copy"));
-        var bullet = new TextBlock { Text = "•", FontSize = 11, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) }; bullet.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush"); row.Children.Add(bullet);
-        row.Children.Add(KeyCap("Shift")); row.Children.Add(HintText("Format"));
-        hint.Children.Add(row);
+        var copyHint = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+        copyHint.Children.Add(KeyCap("C")); copyHint.Children.Add(HintText("Copy"));
+        var formatHint = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+        formatHint.Children.Add(KeyCap("Shift")); formatHint.Children.Add(HintText("Format"));
+        hint.Children.Add(copyHint);
+        hint.Children.Add(formatHint);
 
         var sp = new StackPanel();
         sp.Children.Add(viewHost); sp.Children.Add(pos); sp.Children.Add(colRow); sp.Children.Add(hint);

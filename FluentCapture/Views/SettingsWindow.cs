@@ -16,7 +16,13 @@ public sealed class SettingsWindow : Window
 
     public static void ShowSingle()
     {
-        if (instance != null) { instance.WindowState = WindowState.Normal; instance.Activate(); return; }
+        if (instance != null)
+        {
+            if (!instance.IsVisible) instance.Show();
+            instance.WindowState = WindowState.Normal;
+            WinHelper.Foreground(instance);
+            return;
+        }
         instance = new SettingsWindow(); instance.Show(); WinHelper.Foreground(instance);
     }
 
@@ -84,6 +90,44 @@ public sealed class SettingsWindow : Window
         return new Border { Style = Ui.Style("CardBorder"), Child = sp, Margin = new Thickness(0, 0, 0, 12) };
     }
 
+    static UIElement TemplateHelp()
+    {
+        var variables = new[]
+        {
+            ("$yyyy-MM-dd_HH-mm-ss$", "Date and time"), ("%title%", "Window title"),
+            ("%process%", "Process name"), ("%computername%", "Computer name"),
+            ("%username%", "User name"), ("%width%", "Capture width"),
+            ("%height%", "Capture height"), ("%counter%", "Incrementing number"),
+            ("%title#10%", "Limit title to 10 characters"), ("%process!%", "Process name without .exe"),
+            ("$yyyy-MM-dd$", "Date"), ("$HH-mm-ss$", "Time"),
+            ("$yyyy-MM-dd_HH-mm-ss$", "Date and time"), ("$yyyyMMdd_HHmmss$", "Compact date and time")
+        };
+        var content = new StackPanel { Margin = new Thickness(16, 12, 16, 14) };
+        content.Children.Add(Ui.Label("File name template variables", 13, false, FontWeights.SemiBold));
+        var grid = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        for (int i = 0; i < variables.Length; i += 2)
+        {
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            for (int j = 0; j < 2; j++)
+            {
+                var (token, description) = variables[i + j];
+                var line = new Grid { Margin = new Thickness(0, 4, 12, 4) };
+                line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                line.ColumnDefinitions.Add(new ColumnDefinition());
+                var key = Ui.Label(token, 11, false, FontWeights.SemiBold);
+                key.Margin = new Thickness(0, 0, 8, 0);
+                var detail = Ui.Label(description, 11, true);
+                Grid.SetColumn(detail, 1);
+                line.Children.Add(key); line.Children.Add(detail);
+                Grid.SetRow(line, i / 2); Grid.SetColumn(line, j); grid.Children.Add(line);
+            }
+        }
+        content.Children.Add(grid);
+        return new Border { Style = Ui.Style("CardBorder"), Child = content, Margin = new Thickness(0, 0, 0, 12) };
+    }
+
     static Grid Row(string label, UIElement control, string desc = null, string glyph = null)
     {
         var g = new Grid { Margin = new Thickness(16, 12, 16, 12) };
@@ -120,16 +164,18 @@ public sealed class SettingsWindow : Window
         return sl;
     }
 
-    TextBox Text(string v, Action<string> set, double width = 300)
+    TextBox Text(string v, Action<string> set, double width = 300, Action<string> changed = null)
     {
         var t = new TextBox { Text = v, Width = width, Padding = new Thickness(8, 5, 8, 5) };
+        if (changed != null) t.TextChanged += (_, _) => changed(t.Text);
         t.LostFocus += (_, _) => set(t.Text);
         return t;
     }
 
-    UIElement FolderPicker(string current, Action<string> set)
+    UIElement FolderPicker(string current, Action<string> set, Action<string> changed = null)
     {
         var box = new TextBox { Text = current, Width = 300, Padding = new Thickness(8, 5, 8, 5) };
+        if (changed != null) box.TextChanged += (_, _) => changed(box.Text);
         box.LostFocus += (_, _) => set(box.Text);
         var b = new Button { Content = "Browse…", Margin = new Thickness(6, 0, 0, 0), Padding = new Thickness(12, 5, 12, 5) };
         b.Click += (_, _) =>
@@ -199,11 +245,15 @@ public sealed class SettingsWindow : Window
     UIElement PageSave()
     {
         var p = NewPage("Saving");
-        var preview = Ui.Label("", 12, true); preview.Margin = new Thickness(16, 0, 16, 12);
-        void Refresh() => preview.Text = "Example: " + SaveService.TemplatePreview(s.ScreenshotFolder, s.ScreenshotTemplate, s.ImageFormat);
+        string folderTemplate = s.ScreenshotFolder, nameTemplate = s.ScreenshotTemplate;
+        var preview = Ui.Label("", 12, true); preview.Margin = new Thickness(16, 12, 16, 12);
+        void Refresh() => preview.Text = "Live preview: " + SaveService.TemplatePreview(folderTemplate, nameTemplate, s.ImageFormat, DateTime.Now);
+        var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        timer.Tick += (_, _) => Refresh(); timer.Start();
+        p.Unloaded += (_, _) => timer.Stop();
         p.Children.Add(Card(
-            Row("Screenshot folder", FolderPicker(s.ScreenshotFolder, v => { s.ScreenshotFolder = v; Save(); Refresh(); }), "Default save location"),
-            Row("File name template", Text(s.ScreenshotTemplate, v => { s.ScreenshotTemplate = v; Save(); Refresh(); }, 300)),
+            Row("Screenshot folder", FolderPicker(s.ScreenshotFolder, v => { folderTemplate = s.ScreenshotFolder = v; Save(); Refresh(); }, v => { folderTemplate = v; Refresh(); }), "Default save location"),
+            Row("File name template", Text(s.ScreenshotTemplate, v => { nameTemplate = s.ScreenshotTemplate = v; Save(); Refresh(); }, 300, v => { nameTemplate = v; Refresh(); })),
             preview,
             Row("Image format", Combo(new[] { "png", "jpg", "bmp" }, s.ImageFormat, v => { s.ImageFormat = v; Save(); Refresh(); }, 100)),
             Row("JPEG quality", Slide(10, 100, s.JpegQuality, v => { s.JpegQuality = (int)v; Save(); }, 160))
@@ -214,20 +264,22 @@ public sealed class SettingsWindow : Window
             Row("Auto-save every capture", Check(s.AutoSave, v => { s.AutoSave = v; Save(); }), "On copy or pin"),
             Row("Copy to clipboard when saving", Check(s.CopyOnSave, v => { s.CopyOnSave = v; Save(); }))
         ));
-        var help = Ui.Label(
-            "Template variables: $yyyy-MM-dd_HH-mm-ss$ date/time · %title% window title · %process% process · %computername% · %username% · %width% · %height% · %counter% · %title#10% trim · %process!% no .exe", 12, true);
-        help.Margin = new Thickness(4, 0, 0, 12); p.Children.Add(help);
+        p.Children.Add(TemplateHelp());
         return p;
     }
 
     UIElement PageRecord()
     {
         var p = NewPage("Recording");
-        var preview = Ui.Label("", 12, true); preview.Margin = new Thickness(16, 0, 16, 12);
-        void Refresh() => preview.Text = "Example: " + SaveService.TemplatePreview(s.RecordingFolder, s.RecordingTemplate, s.RecordFormat);
+        string folderTemplate = s.RecordingFolder, nameTemplate = s.RecordingTemplate;
+        var preview = Ui.Label("", 12, true); preview.Margin = new Thickness(16, 12, 16, 12);
+        void Refresh() => preview.Text = "Live preview: " + SaveService.TemplatePreview(folderTemplate, nameTemplate, s.RecordFormat, DateTime.Now);
+        var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        timer.Tick += (_, _) => Refresh(); timer.Start();
+        p.Unloaded += (_, _) => timer.Stop();
         p.Children.Add(Card(
-            Row("Recording folder", FolderPicker(s.RecordingFolder, v => { s.RecordingFolder = v; Save(); Refresh(); })),
-            Row("File name template", Text(s.RecordingTemplate, v => { s.RecordingTemplate = v; Save(); Refresh(); }, 300), "Same variables as screenshots"),
+            Row("Recording folder", FolderPicker(s.RecordingFolder, v => { folderTemplate = s.RecordingFolder = v; Save(); Refresh(); }, v => { folderTemplate = v; Refresh(); })),
+            Row("File name template", Text(s.RecordingTemplate, v => { nameTemplate = s.RecordingTemplate = v; Save(); Refresh(); }, 300, v => { nameTemplate = v; Refresh(); })),
             preview
         ));
         Refresh();
@@ -241,6 +293,7 @@ public sealed class SettingsWindow : Window
             Row("MP4 quality", Combo(new[] { "Low", "Medium", "High" }, s.Mp4Quality, v => { s.Mp4Quality = v; Save(); }, 120)),
             Row("Loop GIF", Check(s.GifLoop, v => { s.GifLoop = v; Save(); }))
         ));
+        p.Children.Add(TemplateHelp());
         return p;
     }
 

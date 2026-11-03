@@ -62,8 +62,7 @@ public static class SaveService
         return seg.Length == 0 ? "_" : (seg.Length > 120 ? seg[..120] : seg);
     }
 
-    /// <summary>Builds the full unique target path (does not create the file).</summary>
-    public static string BuildPath(string folderTemplate, string nameTemplate, string ext, CaptureContext ctx)
+    static string ResolvePath(string folderTemplate, string nameTemplate, string ext, CaptureContext ctx)
     {
         string folder = Expand(folderTemplate, ctx);
         string root = "";
@@ -74,9 +73,16 @@ public static class SaveService
         if (dir.Length == 0) dir = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
 
         string name = Sanitize(Expand(nameTemplate, ctx));
-        if (nameTemplate.Contains("%counter%", StringComparison.OrdinalIgnoreCase)) { SettingsService.Current.Counter++; SettingsService.Save(); }
         string path = Path.Combine(dir, name + "." + ext);
         for (int i = 2; File.Exists(path); i++) path = Path.Combine(dir, $"{name} ({i}).{ext}");
+        return path;
+    }
+
+    /// <summary>Builds the full unique target path (does not create the file).</summary>
+    public static string BuildPath(string folderTemplate, string nameTemplate, string ext, CaptureContext ctx)
+    {
+        string path = ResolvePath(folderTemplate, nameTemplate, ext, ctx);
+        if (nameTemplate.Contains("%counter%", StringComparison.OrdinalIgnoreCase)) { SettingsService.Current.Counter++; SettingsService.Save(); }
         return path;
     }
 
@@ -92,15 +98,12 @@ public static class SaveService
         return BuildPath(s.RecordingFolder, s.RecordingTemplate, ext, ctx);
     }
 
-    public static string TemplatePreview(string folder, string template, string ext)
+    public static string TemplatePreview(string folder, string template, string ext, DateTime? now = null)
     {
-        var ctx = new CaptureContext { Title = "Document1 - Word", Process = "WINWORD.EXE", Width = 1280, Height = 720 };
+        var ctx = new CaptureContext { Title = "Document1 - Word", Process = "WINWORD.EXE", Width = 1280, Height = 720, Time = now ?? DateTime.Now };
         try
         {
-            int saved = SettingsService.Current.Counter;
-            var p = BuildPath(folder, template, ext, ctx);
-            SettingsService.Current.Counter = saved;
-            return p;
+            return ResolvePath(folder, template, ext, ctx);
         }
         catch { return "(invalid template)"; }
     }
