@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\Nick\\Downloads\\FluentSnip\\FluentSnip\\FluentCapture\\FluentCapture.csproj": {}
+    "C:\\Users\\Nick\\Downloads\\FluentCapture\\FluentCapture\\FluentCapture.csproj": {}
   },
   "projects": {
-    "C:\\Users\\Nick\\Downloads\\FluentSnip\\FluentSnip\\FluentCapture\\FluentCapture.csproj": {
+    "C:\\Users\\Nick\\Downloads\\FluentCapture\\FluentCapture\\FluentCapture.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\Nick\\Downloads\\FluentSnip\\FluentSnip\\FluentCapture\\FluentCapture.csproj",
+        "projectUniqueName": "C:\\Users\\Nick\\Downloads\\FluentCapture\\FluentCapture\\FluentCapture.csproj",
         "projectName": "FluentCapture",
-        "projectPath": "C:\\Users\\Nick\\Downloads\\FluentSnip\\FluentSnip\\FluentCapture\\FluentCapture.csproj",
+        "projectPath": "C:\\Users\\Nick\\Downloads\\FluentCapture\\FluentCapture\\FluentCapture.csproj",
         "packagesPath": "C:\\Users\\Nick\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\Nick\\Downloads\\FluentSnip\\FluentSnip\\FluentCapture\\obj\\",
+        "outputPath": "C:\\Users\\Nick\\Downloads\\FluentCapture\\FluentCapture\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

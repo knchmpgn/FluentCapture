@@ -202,11 +202,11 @@ public sealed class CaptureOverlayWindow : Window
         o.Children.Add(swatchRow);
         o.Children.Add(Ui.VSeparator());
 
-        sizeSlider = new Slider { Minimum = 1, Maximum = 30, Width = 100, Value = cfg.AnnotSize, VerticalAlignment = VerticalAlignment.Center, Focusable = false, ToolTip = "Size (mouse wheel)" };
+        sizeSlider = new Slider { Minimum = 1, Maximum = 40, Width = 100, Value = cfg.AnnotSize, VerticalAlignment = VerticalAlignment.Center, Focusable = false, ToolTip = "Size (mouse wheel)" };
         sizeSlider.ValueChanged += (_, e) => { layer.Size = e.NewValue; cfg.AnnotSize = e.NewValue; layer.ApplyStyleToSelected(); };
         o.Children.Add(sizeSlider);
 
-        toolOptions = new StackPanel { Orientation = Orientation.Horizontal };
+        toolOptions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(12, 0, 0, 0) };
         toolOptions.Children.Add(Ui.Chip("Filled", false, on => { layer.Fill = on; layer.ApplyStyleToSelected(); }));
         toolOptions.Children.Add(Ui.Chip("Rounded rect", false, on => { layer.Rounded = on; layer.ApplyStyleToSelected(); }));
         toolOptions.Children.Add(Ui.Chip("Bold", false, on => { layer.Bold = on; layer.ApplyStyleToSelected(); }));
@@ -236,11 +236,17 @@ public sealed class CaptureOverlayWindow : Window
     void UpdateOptionVisibility()
     {
         bool any = tool != AnnotTool.None;
-        swatchRow.Visibility = sizeSlider.Visibility = any && tool != AnnotTool.Eraser ? Visibility.Visible : Visibility.Collapsed;
+        bool showColor = any && tool != AnnotTool.Eraser;
+        swatchRow.Visibility = showColor ? Visibility.Visible : Visibility.Collapsed;
+        sizeSlider.Visibility = any ? Visibility.Visible : Visibility.Collapsed;
+        sizeSlider.ToolTip = tool == AnnotTool.Eraser ? "Eraser size (mouse wheel)" : "Size (mouse wheel)";
         var ch = toolOptions.Children.Cast<ToggleButton>().ToArray();
         ch[0].Visibility = tool is AnnotTool.Rectangle or AnnotTool.Ellipse ? Visibility.Visible : Visibility.Collapsed;
         ch[1].Visibility = tool == AnnotTool.Rectangle ? Visibility.Visible : Visibility.Collapsed;
         ch[2].Visibility = ch[3].Visibility = tool == AnnotTool.Text ? Visibility.Visible : Visibility.Collapsed;
+        toolOptions.Visibility = ch.Any(b => b.Visibility == Visibility.Visible) ? Visibility.Visible : Visibility.Collapsed;
+        optionBar.Visibility = any && (showColor || sizeSlider.Visibility == Visibility.Visible || toolOptions.Visibility == Visibility.Visible)
+            ? Visibility.Visible : Visibility.Collapsed;
     }
 
     void SetColor(Color c)
@@ -343,7 +349,6 @@ public sealed class CaptureOverlayWindow : Window
         double ui = mon.Scale; var mb = mon.Bounds;
         toolbar.LayoutTransform = optionBar.LayoutTransform = new ScaleTransform(ui, ui);
         toolbar.Visibility = Visibility.Visible;
-        optionBar.Visibility = tool != AnnotTool.None ? Visibility.Visible : Visibility.Collapsed;
         var inf = new Size(double.PositiveInfinity, double.PositiveInfinity);
         toolbar.Measure(inf); optionBar.Measure(inf);
         Size ts = toolbar.DesiredSize, os = optionBar.DesiredSize;
@@ -356,11 +361,7 @@ public sealed class CaptureOverlayWindow : Window
         else if (yAbove >= mb.Top + 4) y = yAbove;
         else y = Math.Max(mb.Top + 4, Math.Min(sel.Bottom - total - gap, mb.Bottom - total - 4));
         Canvas.SetLeft(toolbar, x); Canvas.SetTop(toolbar, y);
-        double cx = sel.Left + sel.Width / 2;
-double ox;
-if (cx < mb.Left + mb.Width / 2) ox = x; else ox = x + ts.Width - os.Width;
-ox = Math.Clamp(ox, mb.Left + 4, mb.Right - os.Width - 4);
-        Canvas.SetLeft(optionBar, ox); Canvas.SetTop(optionBar, y + ts.Height + gap);
+        Canvas.SetLeft(optionBar, x); Canvas.SetTop(optionBar, y + ts.Height + gap);
     }
 
     void UpdateMagnifier(Point p)

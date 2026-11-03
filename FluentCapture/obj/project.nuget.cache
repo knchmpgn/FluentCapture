@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "KZ+wilR7dUU=",
+  "dgSpecHash": "A9Fc0NLpBvU=",
   "success": true,
-  "projectFilePath": "C:\\Users\\Nick\\Downloads\\FluentSnip\\FluentSnip\\FluentCapture\\FluentCapture.csproj",
+  "projectFilePath": "C:\\Users\\Nick\\Downloads\\FluentCapture\\FluentCapture\\FluentCapture.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Nick\\.nuget\\packages\\naudio\\2.2.1\\naudio.2.2.1.nupkg.sha512",
     "C:\\Users\\Nick\\.nuget\\packages\\naudio.asio\\2.2.1\\naudio.asio.2.2.1.nupkg.sha512",
