@@ -38,7 +38,16 @@ public sealed class HotkeyService : IDisposable
     public bool Register(string gesture, Action action)
     {
         if (!Gesture.TryParse(gesture, out var mods, out var key)) return false;
-        if (key == Key.Snapshot) return RegisterHook(mods, action);
+        if (key == Key.Snapshot)
+        {
+            // The low-level hook does not receive keys while an elevated window (e.g. an elevated FluentStart start menu) has focus,
+            // because Windows blocks input hooks across integrity levels. RegisterHotKey is not subject to that block, so also try it
+            // as a second path. It may fail (Windows can reserve PrintScreen for Snipping Tool) - that is fine, the hook still works.
+            // Both paths go through Fire(), which drops a duplicate within 400 ms.
+            bool hooked = RegisterHook(mods, action);
+            TryRegisterNative(mods, key, () => Fire(action));
+            return hooked;
+        }
         uint m = 0x4000; // MOD_NOREPEAT
         if (mods.HasFlag(ModifierKeys.Alt)) m |= 1;
         if (mods.HasFlag(ModifierKeys.Control)) m |= 2;
@@ -49,6 +58,28 @@ public sealed class HotkeyService : IDisposable
         if (!NativeMethods.RegisterHotKey(src.Handle, id, m, vk)) return false;
         actions[id] = action;
         return true;
+    }
+
+    DateTime lastFire = DateTime.MinValue;
+
+    void Fire(Action action)
+    {
+        var now = DateTime.UtcNow;
+        if ((now - lastFire).TotalMilliseconds < 400) return;
+        lastFire = now;
+        action();
+    }
+
+    void TryRegisterNative(ModifierKeys mods, Key key, Action action)
+    {
+        uint m = 0x4000; // MOD_NOREPEAT
+        if (mods.HasFlag(ModifierKeys.Alt)) m |= 1;
+        if (mods.HasFlag(ModifierKeys.Control)) m |= 2;
+        if (mods.HasFlag(ModifierKeys.Shift)) m |= 4;
+        if (mods.HasFlag(ModifierKeys.Windows)) m |= 8;
+        uint vk = (uint)KeyInterop.VirtualKeyFromKey(key);
+        int id = nextId++;
+        if (NativeMethods.RegisterHotKey(src.Handle, id, m, vk)) actions[id] = action;
     }
 
     public void UnregisterAll()
@@ -91,8 +122,8 @@ public sealed class HotkeyService : IDisposable
             foreach (var b in hookBindings)
             {
                 if (b.Mods != mods) continue;
-                if (down) { if (!prtDown) { prtDown = true; Application.Current.Dispatcher.BeginInvoke(b.Action); } }
-                else if (up) { if (!prtDown) Application.Current.Dispatcher.BeginInvoke(b.Action); prtDown = false; }
+                if (down) { if (!prtDown) { prtDown = true; var act = b.Action; Application.Current.Dispatcher.BeginInvoke(() => Fire(act)); } }
+                else if (up) { if (!prtDown) { var act = b.Action; Application.Current.Dispatcher.BeginInvoke(() => Fire(act)); } prtDown = false; }
                 return (IntPtr)1;   // swallow so Windows / Snipping Tool does not also react
             }
         }

@@ -342,13 +342,6 @@ public sealed class SettingsWindow : Window
         }
         p.Children.Add(Card(rows.ToArray()));
 
-        var inApp = Ui.Label(
-            "While capturing:  Esc close · Enter / Ctrl+C copy · Ctrl+S save · Ctrl+Shift+S quick save · Ctrl+T pin · Shift+C OCR to clipboard · Shift+Q QR code · Shift+S scrolling screenshot · Shift+R record · C copy color · Shift switch color format · ~ toggle cursor\n" +
-            "Selection:  arrows move 1 px · Shift+arrows shrink · Ctrl+arrows grow · Shift while dragging keeps 1:1 · double-click copies · right-click cancels\n" +
-            "Annotate:  Shift+1…8 and Shift+E select tools · Ctrl+Z / Ctrl+Y undo / redo · Delete removes · wheel changes size · Ctrl+wheel changes opacity\n" +
-            "On a pin:  wheel zoom · Ctrl+wheel opacity · middle-click reset · L lock · T always-on-top · R thumbnail · Space annotate · F2 title · Ctrl+drag drag content out · Esc / double-click close",
-            12, true);
-        inApp.Margin = new Thickness(4, 0, 0, 12); p.Children.Add(inApp);
         return p;
     }
 
