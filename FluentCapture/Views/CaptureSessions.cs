@@ -67,7 +67,7 @@ public sealed class RecordingSession
     readonly TextBlock timeText = Ui.Label("00:00", 14, false, FontWeights.SemiBold);
     readonly DispatcherTimer ui = new() { Interval = TimeSpan.FromMilliseconds(250) };
     readonly DispatcherTimer countdown = new() { Interval = TimeSpan.FromSeconds(1) };
-    Button recBtn, pauseBtn; ComboBox fpsBox, delayBox; ToggleButton gifChip, mp4Chip, sysBtn, micBtn;
+    Button recBtn, saveBtn; ComboBox fpsBox, delayBox; ToggleButton gifChip, mp4Chip, sysBtn, micBtn;
     ScreenRecorder rec; bool recording, busy; int cd;
 
     public static void Begin(Rect regionPx, CaptureContext ctx)
@@ -123,9 +123,9 @@ public sealed class RecordingSession
         row.Children.Add(sysBtn); row.Children.Add(micBtn);
         row.Children.Add(Ui.VSeparator());
         timeText.Margin = new Thickness(4, 0, 8, 0); timeText.MinWidth = 44; row.Children.Add(timeText);
-        pauseBtn = Ui.IconButton(Icons.Pause, "Pause / resume", TogglePause); pauseBtn.IsEnabled = false; row.Children.Add(pauseBtn);
         recBtn = Ui.IconButton(Icons.Record, "Start recording", ToggleRecord);
-        recBtn.Foreground = new SolidColorBrush(Color.FromRgb(0xE8, 0x11, 0x23)); row.Children.Add(recBtn);
+        row.Children.Add(recBtn);
+        saveBtn = Ui.IconButton(Icons.Save, "Save recording (Save as…)", () => _ = SaveRecording()); saveBtn.IsEnabled = false; row.Children.Add(saveBtn);
         bar.Content = row;
         RefreshAudioButtons();
     }
@@ -145,21 +145,20 @@ public sealed class RecordingSession
             int d = SettingsService.Current.RecordDelay;
             if (d > 0) { cd = d; timeText.Text = cd.ToString(); countdown.Start(); } else StartNow();
         }
-        else _ = StopAsync();
+        else TogglePause();
     }
 
     void StartNow()
     {
         var s = SettingsService.Current; bool gif = s.RecordFormat == "gif";
-        string path;
-        try { path = SaveService.RecordingPath(ctx, gif ? "gif" : "mp4"); Directory.CreateDirectory(Path.GetDirectoryName(path)!); }
-        catch (Exception ex) { ToastWindow.Show("Cannot create recording file: " + ex.Message, Icons.Info); return; }
+        string ext = gif ? "gif" : "mp4";
+        string path = Path.Combine(Path.GetTempPath(), "FluentCapture_" + Guid.NewGuid().ToString("N") + "." + ext);
         rec = new ScreenRecorder(region, s.RecordFps, s.RecordCursor, gif, s.GifLoop, s.Mp4Quality, path, s.RecordSystemAudio, s.RecordMic);
         try { rec.Start(); }
         catch (Exception ex) { SettingsService.Log("Recorder start failed: " + ex); ToastWindow.Show("Could not start recording: " + ex.Message, Icons.Info); rec = null; return; }
         recording = true;
         frame.SetColor(true); ui.Start();
-        recBtn.Content = Icons.Stop; recBtn.ToolTip = "Stop recording"; pauseBtn.IsEnabled = true;
+        recBtn.Content = Icons.Pause; recBtn.ToolTip = "Pause recording"; saveBtn.IsEnabled = true;
         gifChip.IsEnabled = mp4Chip.IsEnabled = fpsBox.IsEnabled = delayBox.IsEnabled = false;
         RefreshAudioButtons();
     }
@@ -167,13 +166,13 @@ public sealed class RecordingSession
     void TogglePause()
     {
         if (rec == null) return;
-        if (rec.IsPaused) { rec.Resume(); pauseBtn.Content = Icons.Pause; frame.SetColor(true); }
-        else { rec.Pause(); pauseBtn.Content = Icons.Play; frame.SetColor(false); }
+        if (rec.IsPaused) { rec.Resume(); recBtn.Content = Icons.Pause; recBtn.ToolTip = "Pause recording"; frame.SetColor(true); }
+        else { rec.Pause(); recBtn.Content = Icons.Play; recBtn.ToolTip = "Resume recording"; frame.SetColor(false); }
     }
 
     async Task StopAsync()
     {
-        busy = true; ui.Stop(); recBtn.IsEnabled = pauseBtn.IsEnabled = false; timeText.Text = "Saving…";
+        busy = true; ui.Stop(); recBtn.IsEnabled = false; timeText.Text = "Saving…";
         string path = rec.Path; bool ok = true;
         try { await rec.StopAsync(); }
         catch (Exception ex) { ok = false; SettingsService.Log("Recording failed: " + ex); ToastWindow.Show("Recording failed: " + ex.Message, Icons.Info); }
@@ -184,10 +183,56 @@ public sealed class RecordingSession
                 ("Show in folder", () => CaptureActions.ShowInFolder(path)));
     }
 
+    async Task SaveRecording()
+    {
+        if (busy || rec == null || !recording) return;
+        bool gif = SettingsService.Current.RecordFormat == "gif";
+        string ext = gif ? "gif" : "mp4";
+        string suggested = SaveService.RecordingPath(ctx, ext);
+        var dlg = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Save recording",
+            InitialDirectory = Path.GetDirectoryName(suggested),
+            FileName = Path.GetFileName(suggested),
+            Filter = gif ? "GIF animation|*.gif" : "MP4 video|*.mp4",
+            AddExtension = true,
+            OverwritePrompt = true
+        };
+        bool ok = bar != null ? dlg.ShowDialog(bar) == true : dlg.ShowDialog() == true;
+        if (!ok) return;
+
+        busy = true; ui.Stop();
+        recBtn.IsEnabled = saveBtn.IsEnabled = false;
+        timeText.Text = "Saving…";
+        string tempPath = rec.Path;
+        string dest = dlg.FileName;
+        try
+        {
+            await rec.StopAsync();
+            recording = false;
+            if (File.Exists(dest)) File.Delete(dest);
+            if (!string.Equals(tempPath, dest, StringComparison.OrdinalIgnoreCase))
+                File.Move(tempPath, dest);
+            ToastWindow.Show("Recording saved: " + Path.GetFileName(dest), Icons.Video,
+                ("Open", () => Process.Start(new ProcessStartInfo(dest) { UseShellExecute = true })),
+                ("Show in folder", () => CaptureActions.ShowInFolder(dest)));
+        }
+        catch (Exception ex)
+        {
+            SettingsService.Log("Recording save failed: " + ex);
+            ToastWindow.Show("Recording save failed: " + ex.Message, Icons.Info);
+        }
+        finally
+        {
+            try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
+            Finish();
+        }
+    }
+
     void Cancel()
     {
         if (busy) return;
-        if (recording) { _ = StopAsync(); return; }     // never throw away a running recording
+        if (recording) { _ = CancelRecording(); return; }     // discard the running recording
         countdown.Stop(); Finish();
     }
 
