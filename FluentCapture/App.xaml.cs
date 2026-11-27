@@ -28,6 +28,10 @@ public partial class App : Application
                 "(not Program Files) or your settings will not be saved.", "FluentSnip", MessageBoxButton.OK, MessageBoxImage.Warning);
         AppController.Start();
 
+        // Command-line: -activate starts the screenshot tool
+        if (e.Args.Any(a => string.Equals(a, "-activate", StringComparison.OrdinalIgnoreCase)))
+            Dispatcher.BeginInvoke(() => AppController.StartCapture(Views.OverlayIntent.Capture));
+
         // a second launch opens the settings window of this instance (lets you recover a hidden tray icon)
         var t = new Thread(() =>
         {
